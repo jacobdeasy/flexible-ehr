@@ -45,7 +45,8 @@ Here are the required steps to replicate our results:
         python -m flexehr.benchmark.extract_subjects {PATH TO MIMIC-III CSVs} data/root/
         python -m flexehr.benchmark.validate_events data/root/
 
-3. Extract individual stays from each patient. but **DO NOT** select or clean variables.
+3. Extract individual stays from each patient. Patient data is simply separated by admission information.
+
     a. **No variable selection.**
     b. **No variable cleaning.**
 
