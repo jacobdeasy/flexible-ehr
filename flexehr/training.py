@@ -30,6 +30,8 @@ class Trainer():
 		self.device = device
 		self.logger = logger
 		self.save_dir = save_dir
+		self.is_progress_bar = is_progress_bar
+
 		self.losses_logger = LossesLogger(os.path.join(self.save_dir, TRAIN_LOSSES_LOGFILE))
 		self.logger.info(f'Training Device: {self.device}')
 
@@ -67,8 +69,9 @@ class Trainer():
 				iter_loss = self._train_iteration(data, y_true, storer)
 				epoch_loss += iter_loss
 
-				t.set_postfix(loss=iter_loss)
-				t.update()
+				if self.is_progress_bar:
+					t.set_postfix(loss=iter_loss)
+					t.update()
 
 		mean_epoch_loss = epoch_loss / len(data_loader)
 

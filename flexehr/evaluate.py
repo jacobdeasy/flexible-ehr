@@ -17,9 +17,9 @@ METRICS_FILENAME = 'metrics.log'
 METRIC_HELPERS_FILE = 'metric_helpers.pth'
 
 
-class Evaluator:
+class Evaluator():
     """
-    Class to handle training of model
+    Class to handle model evaluation
 
     Parameters
     ----------
@@ -86,12 +86,12 @@ class Evaluator:
         data_loader : torch.utils.data.DataLoader
         """
         storer = defaultdict(list)
-        for data, batch_true in tqdm(data_loader, leave=False, disable=not self.is_progress_bar):
+        for data, y_true in tqdm(data_loader, leave=False, disable=not self.is_progress_bar):
             data = data.to(self.device)
-            batch_true = batch_true.to(self.device)
+            y_true = y_true.to(self.device)
 
-            batch_pred = self.model(data)
-            _ = self.loss_f(batch_pred, batch_true, self.model.training, storer)
+            y_pred = self.model(data)
+            _ = self.loss_f(y_pred, y_true, self.model.training, storer)
 
         losses = {k: sum(v) / len(data_loader) for k, v in storer.items()}
 

@@ -32,7 +32,7 @@ class BaseLoss(abc.ABC):
 		How many steps between each loss record.
 	"""
 
-	def __init__(self, record_loss_every=50):
+	def __init__(self, record_loss_every=1):
 		self.n_train_steps = 0
 		self.record_loss_every = record_loss_every
 
@@ -50,12 +50,12 @@ class BaseLoss(abc.ABC):
 		if is_train:
 			self.n_train_steps += 1
 
-		if not is_train or self.n_train_steps % self.record_loss_every == 1:
+		if not is_train or self.n_train_steps % self.record_loss_every == 0:
 			storer = storer
 		else:
 			storer = None
 
-		return None
+		return storer
 
 
 class BCE(BaseLoss):

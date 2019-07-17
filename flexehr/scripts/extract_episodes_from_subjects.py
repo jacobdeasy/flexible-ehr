@@ -69,11 +69,11 @@ def main(root):
 				continue
 
 			episode = add_hours_elpased_to_events(episode, intime).set_index('HOURS').sort_index(axis=0)
-			episodic_data.ix[episodic_data.index==stay_id].to_csv(os.path.join(root, subject_dir, 'episode{}.csv'.format(i+1)), index_label='Icustay')
+			episodic_data.ix[episodic_data.index==stay_id].to_csv(os.path.join(root, subject_dir, f'episode{i+1}.csv'), index_label='Icustay')
 			columns = list(episode.columns)
 			columns_sorted = sorted(columns, key=(lambda x: "" if x == "Hours" else x))
 			episode = episode[columns_sorted]
-			episode.to_csv(os.path.join(root, subject_dir, 'episode{}_timeseries.csv'.format(i+1)), index_label='Hours')
+			episode.to_csv(os.path.join(root, subject_dir, f'episode{i+1}_timeseries.csv'), index_label='Hours')
 
 
 if __name__ == '__main__':

@@ -6,33 +6,22 @@ import shutil
 from tqdm import tqdm
 
 
-def continuous_mask(v):
-	try:
-		tmp = float(v)
-		return True
-	except:
-		return False
-
-
-def quantize_events(in_dir, out_dir, data, V, n_bins):
+def quantize_events(data, t_hours, n_bins, V):
 	"""Quantize events based on a dictionary labels to values.
 
 	Parameters
 	----------
-	in_dir: str
-		Directory containing subject sub-directories.
-
-	out_dir: str
-		Directory to contain BINNED subject sub-directories.
-
 	data: str
-		Data directory to save token to index dictionary.
+		Path to data directory.
 
-	V: dict
-		Value dictionary (e.g. {'Heart Rate': np.array([72, 84,...]), ...})
+	t_hours: int
+		Max length of ICU stay data
 
 	n_bins: int
-		Number of bins to quantize 
+		Number of discrete bins.
+
+	V: dict
+		Value dictionary e.g. {'Heart Rate': np.array([72, 84,...]), ...}
 	"""
 	print('\nGenerating percentiles...')
 	P = []
@@ -54,22 +43,26 @@ def quantize_events(in_dir, out_dir, data, V, n_bins):
 			return f'{label} {value}'
 
 	print('\nCreating tokens based on percentiles...')
-	patients = list(filter(str.isdigit, os.listdir(in_dir)))
+	in_dir = os.path.join(data, f'root_{t_hours}')
+	out_dir = os.path.join(data, f'root_{t_hours}_{n_bins}')
+
+	if not os.path.exists(out_dir):
+		os.mkdir(out_dir)
+
+	patients = os.listdir(in_dir)
 	token_list = []
 
 	for patient in tqdm(patients):
 		if not os.path.exists(os.path.join(out_dir, patient)):
 			os.mkdir(os.path.join(out_dir, patient))
-		shutil.copy(os.path.join(in_dir, patient, 'stays.csv'),
-					os.path.join(out_dir, patient, 'stays.csv'))
 
 		patient_ts_files = list(filter(lambda x: x.find('timeseries') != -1, 
 			os.listdir(os.path.join(in_dir, patient))))
 
 		for ts_file in patient_ts_files:
-			lb_file = ts_file.replace('_timeseries', '')
-			shutil.copy(os.path.join(in_dir, patient, lb_file),
-						os.path.join(out_dir, patient, lb_file))
+			ev_file = ts_file.replace('_timeseries', '')
+			shutil.copy(os.path.join(in_dir, patient, ev_file),
+						os.path.join(out_dir, patient, ev_file))
 
 			e = pd.read_csv(os.path.join(in_dir, patient, ts_file))
 
@@ -84,30 +77,24 @@ def quantize_events(in_dir, out_dir, data, V, n_bins):
 	print(f'{len(token_list)} tokens overall')
 
 	token2index = dict(zip(token_list, list(range(1, len(token_list)+1))))
-	np.save(os.path.join(data, f'token2index_{n_bins}-bins.npy'), token2index)
+	np.save(os.path.join(data, f'token2index_{t_hours}_{n_bins}.npy'), token2index)
 
 
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(description='Extract episodes from per-subject data.')
-	parser.add_argument('root', type=str,
-						help='Directory containing subject sub-directories.')
-	parser.add_argument('root_binned', type=str,
-						help='Directory to contain BINNED subject sub-directories.')
-	parser.add_argument('-n', '--n_bins', type=int,
+	parser = argparse.ArgumentParser(description='Quantize events using value dictionary.')
+	parser.add_argument('data', type=str,
+						help='Data directory.')
+	parser.add_argument('-t', '--t-hours', type=int,
+						default=48,
+						help='Maximum number of hours to allow in timeseries.')
+	parser.add_argument('-n', '--n-bins', type=int,
 						default=20,
 						help='Number of percentile bins.')
-	parser.add_argument('-D', '--data', type=str,
-						default=os.path.join(os.path.dirname(__file__), os.pardir,
-											 os.pardir, 'data'),
-						help='Data directory to read value dictionary from.')
 	parser.add_argument('-d', '--dict', type=str,
 						default='value_dict.npy',
 						help='Dictionary file name.')
 	args, _ = parser.parse_known_args()
 
-	if not os.path.exists(args.root_binned):
-		os.makedirs(args.root_binned)
-
 	value_dict = np.load(os.path.join(args.data, args.dict)).item()
 
-	quantize_events(args.root, args.root_binned, args.data, value_dict, args.n_bins)
+	quantize_events(args.data, args.t_hours, args.n_bins, value_dict)

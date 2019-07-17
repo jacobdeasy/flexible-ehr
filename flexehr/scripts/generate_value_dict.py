@@ -3,7 +3,6 @@ import numpy as np
 import os
 import pandas as pd
 import regex as re
-
 from tqdm import tqdm
 
 
@@ -22,23 +21,22 @@ def continuous_mask(v):
 		return False
 
 
-def gen_value_dict(root, data_dir, item2var):
+def generate_value_dict(data, t_hours, item2label):
 	"""Generate a dictionary of labels to value arrays from `ITEMID`s and values.
 
 	Parameters
 	----------
-	root: str
-		Path of directory of subjects with sub-directory episodes.
+	data: str
+		Path to data directory.
 
-	data_dir: str
-		Path of data directory to write value dictionary to.
+	t_hours: str
+		Max length of ICU stay data.
 
-	item2var: str
-		Csv file with ITEMID and variable names.
+	item2label: dict
+		Dictionary mapping `ITEMID`s to variable names.
 	"""
-	item2var = pd.read_csv('../benchmark/resources/itemid_to_variable_map.csv')
-	item2label = item2var.set_index('ITEMID')['MIMIC LABEL'].to_dict()
-	patients = list(filter(str.isdigit, os.listdir(root)))
+	root = os.path.join(data, f'root_{t_hours}')
+	patients = os.listdir(root)
 
 	print('\nExtracting numeric labels and values...')
 	d = {}
@@ -80,23 +78,23 @@ def gen_value_dict(root, data_dir, item2var):
 					d[label] = np.empty(0)
 				d[label] = np.concatenate((d[label], p_vals[e['LABEL']==label]))
 
-	np.save(os.path.join(data_dir, 'value_dict'), d)
+	np.save(os.path.join(data, f'value_dict_{t_hours}'), d)
 
 
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(description='Extract episodes from per-subject data.')
-	parser.add_argument('root', type=str,
-						help='Directory containing subject sub-directories.')
-	parser.add_argument('-d', '--data', type=str,
-						default=os.path.join(os.pardir, os.pardir, 'data'),
+	parser = argparse.ArgumentParser(description='Generate value dictionary from subject data.')
+	parser.add_argument('data', type=str,
 						help='Data directory to write value dictionary to.')
+	parser.add_argument('-t', '--t-hours', type=int,
+						default=48,
+						help='Maximum number of hours to allow in timeseries.')
 	parser.add_argument('-i', '--item2var', type=str,
-                    	default=os.path.join(os.pardir, os.pardir,
+                    	default=os.path.join(os.path.dirname(__file__), os.pardir,
                     						 'benchmark/resources/itemid_to_variable_map.csv'),
                     	help='csv file with ITEMID and variable names.')
 	args, _ = parser.parse_known_args()
 
-	if not os.path.exists(args.root_binned):
-		os.makedirs(args.root_binned)
+	item2var = pd.read_csv(args.item2var)
+	item2label = item2var.set_index('ITEMID')['MIMIC LABEL'].to_dict()
 
-	main(args.root, args.item2var)
+	generate_value_dict(args.data, args.t_hours, item2label)

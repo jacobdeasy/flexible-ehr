@@ -7,6 +7,7 @@ import torch
 
 from flexehr import init_specific_model
 
+
 MODEL_FILENAME = "model.pt"
 META_FILENAME = "specs.json"
 
@@ -93,19 +94,16 @@ def load_model(directory, is_gpu=True, filename=MODEL_FILENAME):
     device = torch.device('cuda' if torch.cuda.is_available() and is_gpu
                           else 'cpu')
 
-    path_to_model = os.path.join(directory, MODEL_FILENAME)
-
     metadata = load_metadata(directory)
-    n_tokens = metadata['n_tokens']
-    latent_dim = metadata['latent_dim']
-    hidden_dim = metadata['hidden_dim']
-    model_type = metadata['model_type']
-    dt = metadata['dt']
-    weighted = metadata['weighted']
-
     path_to_model = os.path.join(directory, filename)
-    model = _get_model(model_type, n_tokens, latent_dim, hidden_dim, dt, weighted,
-                       device, path_to_model)
+
+    model = init_specific_model(metadata['model_type'], metadata['n_tokens'],
+                                metadata['latent_dim'], metadata['hidden_dim'],
+                                dt=metadata['dt'], weighted=metadata['weighted'],
+                                dynamic=metadata['dynamic']).to(device)
+
+    model.load_state_dict(torch.load(os.path.join(directory, filename)), strict=False)
+    model.eval()
 
     return model
 
@@ -131,33 +129,6 @@ def load_checkpoints(directory, is_gpu=True):
                 checkpoints.append((epoch_idx, model))
 
     return checkpoints
-
-
-def _get_model(model_type, n_tokens, latent_dim, hidden_dim, dt, weighted,
-               device, path_to_model):
-    """ Load a single model.
-
-    Parameters
-    ----------
-    model_type : str
-        The name of the model to load. For example Burgess.
-    n_tokens : int
-        Size of embedding vocabulary
-    latent_dim : int
-        The number of latent dimensions in the bottleneck.
-
-    device : str
-        Either 'cuda' or 'cpu'
-    path_to_device : str
-        Full path to the saved model on the device.
-    """
-    model = init_specific_model(model_type, n_tokens, latent_dim, hidden_dim,
-                                dt=dt, weighted=weighted).to(device)
-    # works with state_dict to make it independent of the file structure
-    model.load_state_dict(torch.load(path_to_model), strict=False)
-    model.eval()
-
-    return model
 
 
 def numpy_serialize(obj):
