@@ -1,18 +1,14 @@
 import json
+import numpy as np
 import os
 import re
-
-import numpy as np
 import torch
 
-from flexehr import init_specific_model
+from flexehr.models.models import init_model
+from utils.helpers import get_device
 
 
-MODEL_FILENAME = "model.pt"
-META_FILENAME = "specs.json"
-
-
-def save_model(model, directory, metadata=None, filename=MODEL_FILENAME):
+def save_model(model, directory, metadata=None, filename='model.pt'):
     """
     Save a model and corresponding metadata.
 
@@ -22,16 +18,17 @@ def save_model(model, directory, metadata=None, filename=MODEL_FILENAME):
         Model.
 
     directory : str
-        Path to the directory where to save the data.
+        Path to save directory.
 
-    metadata : dict
+    metadata : dict, optional
         Metadata to save.
+
+    filename: str, optional
     """
     device = next(model.parameters()).device
     model.cpu()
 
     if metadata is None:
-        # save the minimum required for loading
         metadata = dict(n_tokens=model.n_tokens, latent_dim=model.latent_dim,
                         hidden_dim=model.hidden_dim, model_type=model.model_type,
                         dt=model.dt, weighted=model.weighted)
@@ -44,7 +41,7 @@ def save_model(model, directory, metadata=None, filename=MODEL_FILENAME):
     model.to(device)  # restore device
 
 
-def load_metadata(directory, filename=META_FILENAME):
+def load_metadata(directory, filename='meta.json'):
     """Load the metadata of a training directory.
 
     Parameters
@@ -60,7 +57,7 @@ def load_metadata(directory, filename=META_FILENAME):
     return metadata
 
 
-def save_metadata(metadata, directory, filename=META_FILENAME, **kwargs):
+def save_metadata(metadata, directory, filename='meta.json', **kwargs):
     """Load the metadata of a training directory.
 
     Parameters
@@ -80,7 +77,7 @@ def save_metadata(metadata, directory, filename=META_FILENAME, **kwargs):
         json.dump(metadata, f, indent=4, sort_keys=True, **kwargs)
 
 
-def load_model(directory, is_gpu=True, filename=MODEL_FILENAME):
+def load_model(directory, is_gpu=True, filename='model.pt'):
     """Load a trained model.
 
     Parameters
@@ -91,16 +88,14 @@ def load_model(directory, is_gpu=True, filename=MODEL_FILENAME):
     is_gpu : bool
         Whether to load on GPU is available.
     """
-    device = torch.device('cuda' if torch.cuda.is_available() and is_gpu
-                          else 'cpu')
-
+    device = get_device(is_gpu=is_gpu)
     metadata = load_metadata(directory)
     path_to_model = os.path.join(directory, filename)
 
-    model = init_specific_model(metadata['model_type'], metadata['n_tokens'],
-                                metadata['latent_dim'], metadata['hidden_dim'],
-                                dt=metadata['dt'], weighted=metadata['weighted'],
-                                dynamic=metadata['dynamic']).to(device)
+    model = init_model(metadata['model_type'], metadata['n_tokens'],
+                       metadata['latent_dim'], metadata['hidden_dim'],
+                       dt=metadata['dt'], weighted=metadata['weighted'],
+                       dynamic=metadata['dynamic']).to(device)
 
     model.load_state_dict(torch.load(os.path.join(directory, filename)), strict=False)
     model.eval()

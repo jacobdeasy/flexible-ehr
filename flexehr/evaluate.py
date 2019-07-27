@@ -1,20 +1,14 @@
-import os
 import logging
-from collections import defaultdict
 import json
-from timeit import default_timer
-
-from tqdm import tqdm, trange
 import numpy as np
+import os
 import torch
+from collections import defaultdict
+from timeit import default_timer
+from tqdm import tqdm, trange
 
 from flexehr.models.losses import get_loss_f
 from flexehr.utils.modelIO import save_metadata
-
-
-TEST_LOSSES_FILE = 'test_losses.log'
-METRICS_FILENAME = 'metrics.log'
-METRIC_HELPERS_FILE = 'metric_helpers.pth'
 
 
 class Evaluator():
@@ -24,20 +18,36 @@ class Evaluator():
     Parameters
     ----------
     model: flexehr.models.model
+        Model to be evaluated.
+
+    loss_f: flexehr.models.losses
+
+
+    device: torch.device, optional
+        Device used for running the model.
+
+    logger: logger.Logger, optional
+
+
+    save_dir: str, optional
+        Name of save directory.
+
+    progress_bar: bool, optional
+        Whether to have a progress bar.    
     """
 
     def __init__(self, model, loss_f,
                  device=torch.device('cpu'),
                  logger=logging.getLogger(__name__),
                  save_dir='results',
-                 is_progress_bar=True):
+                 progress_bar=True):
 
         self.model = model.to(device)
         self.loss_f = loss_f
         self.device = device
         self.logger = logger
         self.save_dir = save_dir
-        self.is_progress_bar = is_progress_bar
+        self.progress_bar = progress_bar
         self.logger.info(f'Testing Device: {self.device}')
 
     def __call__(self, data_loader, is_metrics=False, is_losses=True):
@@ -48,7 +58,7 @@ class Evaluator():
         data_loader: torch.utils.data.DataLoader
 
         is_metrics: bool, optional
-            Whether to compute and store the disentangling metrics.
+            Whether to compute metrics.
 
         is_losses: bool, optional
             Whether to compute and store the test losses.
@@ -62,16 +72,13 @@ class Evaluator():
             self.logger.info('Computing metrics...')
             metrics = self.compute_metrics(data_loader)
             self.logger.info(f'Losses: {metrics}')
-            save_metadata(metrics, self.save_dir, filename=METRICS_FILENAME)
+            save_metadata(metrics, self.save_dir, filename='metrics.log')
 
         if is_losses:
             self.logger.info('Computing losses...')
             losses = self.compute_losses(data_loader)
             self.logger.info(f'Losses: {losses}')
-            save_metadata(losses, self.save_dir, filename=TEST_LOSSES_FILE)
-
-        if is_still_training:
-            self.model.train()
+            save_metadata(losses, self.save_dir, filename='test_losses.log')
 
         time_elapsed = (default_timer() - start) / 60
         self.logger.info(f'Finished evaluating after {time_elapsed:.1f} min.')
@@ -86,7 +93,7 @@ class Evaluator():
         data_loader : torch.utils.data.DataLoader
         """
         storer = defaultdict(list)
-        for data, y_true in tqdm(data_loader, leave=False, disable=not self.is_progress_bar):
+        for data, y_true in tqdm(data_loader, leave=False, disable=not self.progress_bar):
             data = data.to(self.device)
             y_true = y_true.to(self.device)
 

@@ -1,96 +1,167 @@
 import logging
+import numpy as np
 import os
 import torch
-from timeit import default_timer
 from collections import defaultdict
-
+from sklearn.metrics import auc, roc_auc_score, roc_curve
+from timeit import default_timer
 from tqdm import trange
 from torch.nn import functional as F
 
 from flexehr.utils.modelIO import save_model
-
-
-TRAIN_LOSSES_LOGFILE = 'train_losses.log'
+from utils.helpers import array
 
 
 class Trainer():
 	"""
-	Class to handle training of model.
+    Class to handle model training and evaluation
+
+    Parameters
+    ----------
+    model: flexehr.models.model
+        Model to be evaluated.
+
+    loss_f: flexehr.models.losses
+		Loss function.
+
+	optimizer: torch.optim.optimizer
+		PyTorch optimizer used to minimize `loss_f`.
+
+    device: torch.device, optional
+        Device used for running the model.
+
+	early_stopping: bool, optional
+		Whether to make use of early stopping.
+
+    save_dir: str, optional
+        Name of save directory.
+
+    p_bar: bool, optional
+        Whether to have a progress bar.
+
+	logger: logger.Logger, optional
+    	Logger to record info.
 	"""
 
-	def __init__(self, model, optimizer, loss_f,
+	def __init__(self, model, loss_f,
+				 optimizer=None,
 				 device=torch.device('cpu'),
-				 logger=logging.getLogger(__name__),
+				 early_stopping=True,
 				 save_dir='results',
-				 is_progress_bar=True):
+				 p_bar=True,
+				 logger=logging.getLogger(__name__)):
 
 		self.model = model
-		self.optimizer = optimizer
 		self.loss_f = loss_f
+		self.optimizer = optimizer
 		self.device = device
-		self.logger = logger
+		self.early_stopping = 0 if early_stopping else None
 		self.save_dir = save_dir
-		self.is_progress_bar = is_progress_bar
+		self.p_bar = p_bar
+		self.logger = logger
 
-		self.losses_logger = LossesLogger(os.path.join(self.save_dir, TRAIN_LOSSES_LOGFILE))
-		self.logger.info(f'Training Device: {self.device}')
+		self.max_v_auroc = -np.inf
+		if self.optimizer is not None:
+			self.losses_logger = LossesLogger(os.path.join(self.save_dir, 'train_losses.log'))
+		self.logger.info(f'Device: {self.device}')
 
-	def __call__(self, data_loader,
-				 epochs=10,
-				 checkpoint_every=10):
-		"""
-		Trains the model
-		"""
+	def train(self, train_loader, valid_loader,
+			  epochs=10,
+			  early_stopping=5):
+		"""Trains the model."""
 		start = default_timer()
-		self.model.train()
+
 		for epoch in range(epochs):
 			storer = defaultdict(list)
-			mean_epoch_loss = self._train_epoch(data_loader, storer, epoch)
-			self.logger.info(f'Epoch: {epoch+1} Average loss {mean_epoch_loss:.4f}')
+
+			self.model.train()
+			t_loss = self._train_epoch(train_loader, storer)
+
+			self.model.eval()
+			v_loss = self._valid_epoch(valid_loader, storer)
+
+			self.logger.info(f'Train loss {t_loss:.4f}')
+			self.logger.info(f'Valid loss {v_loss:.4f}')
+			self.logger.info(f'Valid auroc {storer["auroc"][0]:.4f}')
 			self.losses_logger.log(epoch, storer)
 
-			if epoch % checkpoint_every == 0:
-				save_model(self.model, self.save_dir,
-						   filename=f'model-{epoch}.pt')
+			if storer['auroc'][0] > self.max_v_auroc:
+				self.max_v_auroc = storer['auroc'][0]
+				save_model(self.model, self.save_dir, filename='model.pt')
+				self.early_stopping = 0
 
-		self.model.eval()
+			if self.early_stopping == early_stopping:
+				break
+			self.early_stopping += 1
 
 		delta_time = (default_timer() - start) / 60
-		self.logger.info(f'Finished training after {delta_time:.1f} min.')
+		self.logger.info(f'Finished training after {delta_time:.1f} minutes.')
 
-	def _train_epoch(self, data_loader, storer, epoch):
-		"""
-		Trains the model for one epoch
-		"""
+	def _train_epoch(self, data_loader, storer):
+		"""Trains the model on the validation set for one epoch."""
 		epoch_loss = 0.
-		#kwarg stuff
-		with trange(len(data_loader)) as t:
-			for _, (data, y_true) in enumerate(data_loader):
-				iter_loss = self._train_iteration(data, y_true, storer)
-				epoch_loss += iter_loss
 
-				if self.is_progress_bar:
-					t.set_postfix(loss=iter_loss)
+		with trange(len(data_loader)) as t:
+			for data, y_true in data_loader:
+				data = data.to(self.device)
+				y_true = y_true.to(self.device)
+
+				y_pred = self.model(data)
+				iter_loss = self.loss_f(y_pred, y_true, self.model.training, storer)
+				epoch_loss += iter_loss.item()
+
+				self.optimizer.zero_grad()
+				iter_loss.backward()
+				self.optimizer.step()
+
+				if self.p_bar:
+					t.set_postfix(loss=iter_loss.item())
 					t.update()
 
-		mean_epoch_loss = epoch_loss / len(data_loader)
+		return epoch_loss / len(data_loader)
 
-		return mean_epoch_loss
+	def _valid_epoch(self, data_loader, storer=defaultdict(list)):
+		"""Trains the model on the validation set for one epoch."""
+		epoch_loss = 0.
+		y_preds = []
 
-	def _train_iteration(self, data, batch_true, storer):
-		"""
-		Trains the model for one iteration on a batch of data.
-		"""
-		data = data.to(self.device)
-		batch_true = batch_true.to(self.device)
+		with trange(len(data_loader)) as t:
+			for data, y_true in data_loader:
+				data = data.to(self.device)
+				y_true = y_true.to(self.device)
 
-		batch_pred = self.model(data)
-		loss = self.loss_f(batch_pred, batch_true, self.model.training, storer)
-		self.optimizer.zero_grad()
-		loss.backward()
-		self.optimizer.step()
+				y_pred = self.model(data)
+				y_preds += [array(y_pred)]
+				iter_loss = self.loss_f(y_pred, y_true, self.model.training, storer)
+				epoch_loss += iter_loss.item()
 
-		return loss.item()
+				if self.p_bar:
+					t.set_postfix(loss=iter_loss.item())
+					t.update()
+
+		y_preds = np.concatenate(y_preds)
+		y_trues = data_loader.dataset.Y
+
+		metrics = self.compute_metrics(y_preds, y_trues)
+		storer.update(metrics)
+
+		return epoch_loss / len(data_loader)
+
+	def compute_metrics(self, y_pred, y_true):
+		"""Compute metrics for predicted vs true labels."""
+		if not isinstance(y_pred, np.ndarray):
+			y_pred = array(y_pred)
+		if not isinstance(y_true, np.ndarray):
+			y_true = array(y_true)
+
+		if y_pred.ndim == 2:
+			y_pred = y_pred[:, -1]
+			y_true = y_true[:, -1]
+
+		metrics = {}
+		metrics['auroc'] = [roc_auc_score(y_true, y_pred)]
+
+		return metrics
 
 
 class LossesLogger(object):
@@ -111,17 +182,13 @@ class LossesLogger(object):
 		file_handler.setLevel(1)
 		self.logger.addHandler(file_handler)
 
-		header = ','.join(['Epoch', 'Loss', 'Value'])
+		header = ','.join(['Epoch', 'Train Loss', 'Valid Loss', 'AUROC'])
 		self.logger.debug(header)
 
-	def log(self, epoch, losses_storer):
+	def log(self, epoch, storer):
 		"""Write to the log file."""
-		for k, v in losses_storer.items():
-			log_string = ','.join(str(item) for item in [epoch, k, mean(v)])
-			self.logger.debug(log_string)
-
-
-# HELPERS
-def mean(l):
-	"""Compute the mean of a list."""
-	return sum(l) / len(l)
+		log_string = [epoch+1]
+		for k in storer.keys():
+			log_string += [sum(storer[k]) / len(storer[k])]
+		log_string = ','.join(str(item) for item in log_string)
+		self.logger.debug(log_string)

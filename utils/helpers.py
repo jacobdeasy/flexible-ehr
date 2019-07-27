@@ -1,35 +1,22 @@
 import argparse
 import numpy as np
 import os
-import shutil
 import random
+import shutil
 import torch
 
 
-def create_safe_directory(directory, logger=None):
-    """Create a directory and archive the previous one if already existed."""
-    if os.path.exists(directory):
-        if logger is not None:
-            logger.warning(f"Directory {directory} already exists. Archiving it to {directory}.zip")
-        shutil.make_archive(directory, 'zip', directory)
-        shutil.rmtree(directory)
-    os.makedirs(directory)
+def array(x):
+    """Place tensor on cpu and convert to numpy.ndarray."""
+    if x.device != torch.device('cpu'):
+        x = x.cpu()
 
-
-def set_seed(seed):
-    """Set all random seeds."""
-    if seed is not None:
-        np.random.seed(seed)
-        random.seed(seed)
-        torch.manual_seed(seed)
-        # if want pure determinism could uncomment below: but slower
-        # torch.backends.cudnn.deterministic = True
+    return x.detach().numpy()
 
 
 def get_device(is_gpu=True):
     """Return the correct device"""
-    return torch.device("cuda" if torch.cuda.is_available() and is_gpu
-                        else "cpu")
+    return torch.device('cuda' if torch.cuda.is_available() and is_gpu else 'cpu')
 
 
 def get_model_device(model):
@@ -41,17 +28,27 @@ def get_n_param(model):
     """Return the number of parameters."""
     model_parameters = filter(lambda p: p.requires_grad, model.parameters())
     nParams = sum([np.prod(p.size()) for p in model_parameters])
+
     return nParams
 
 
-def check_bounds(value, type=float, lb=-float("inf"), ub=float("inf"),
-                 is_inclusive=True, name="value"):
-    """Argparse bound checker"""
-    value = type(value)
-    is_in_bound = lb <= value <= ub if is_inclusive else lb < value < ub
-    if not is_in_bound:
-        raise argparse.ArgumentTypeError("{}={} outside of bounds ({},{})".format(name, value, lb, ub))
-    return value
+def new_model_dir(directory, logger=None):
+    """Create a directory and archive the previous one if already existed."""
+    if os.path.exists(directory):
+        if logger is not None:
+            logger.warning(f'{directory} already exists. Archiving to {directory}.zip')
+        shutil.make_archive(directory, 'zip', directory)
+        shutil.rmtree(directory)
+    os.makedirs(directory)
+
+
+def set_seed(seed):
+    """Set all random seeds."""
+    if seed is not None:
+        np.random.seed(seed)
+        random.seed(seed)
+        torch.manual_seed(seed)
+        # torch.backends.cudnn.deterministic = True
 
 
 class FormatterNoDuplicate(argparse.ArgumentDefaultsHelpFormatter):
@@ -60,7 +57,8 @@ class FormatterNoDuplicate(argparse.ArgumentDefaultsHelpFormatter):
 
     Note
     ----
-    - code modified from cPython: https://github.com/python/cpython/blob/master/Lib/argparse.py
+    - code modified from cPython:
+    https://github.com/python/cpython/blob/master/Lib/argparse.py
     """
 
     def _format_action_invocation(self, action):
@@ -68,7 +66,9 @@ class FormatterNoDuplicate(argparse.ArgumentDefaultsHelpFormatter):
         if not action.option_strings:
             default = self._get_default_metavar_for_positional(action)
             metavar, = self._metavar_formatter(action, default)(1)
+
             return metavar
+
         else:
             parts = []
             # if the Optional doesn't take a value, format is:
@@ -85,4 +85,5 @@ class FormatterNoDuplicate(argparse.ArgumentDefaultsHelpFormatter):
                     parts.append('%s' % (option_string))
                 # store DEFAULT for the last one
                 parts[-1] += ' %s' % args_string
+
             return ', '.join(parts)

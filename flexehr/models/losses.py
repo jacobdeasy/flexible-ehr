@@ -8,20 +8,6 @@ from torch.nn import functional as F
 from torch import optim
 
 
-LOSSES = ['BCE', 'wBCE']
-
-
-def get_loss_f(loss_name, **kwargs_parse):
-	"""Return the correct loss function given the argparse arguments."""
-	if loss_name == 'BCE':
-		return BCE()
-	elif loss_name == 'wBCE':
-		pass
-	else:
-		assert loss_name not in LOSSES
-		raise ValueError(f'Unknown loss: {loss_name}')
-
-
 class BaseLoss(abc.ABC):
 	"""
 	Base class for losses.
@@ -37,14 +23,8 @@ class BaseLoss(abc.ABC):
 		self.record_loss_every = record_loss_every
 
 	@abc.abstractmethod
-	def __call__(self, y_pred, y_true, is_train, storer, **kwargs):
-		"""
-		Calculates loss for a batch of data.
-
-		Parameters
-		----------
-		y_true : torch.Tensor
-		"""
+	def __call__(self, y_pred, y_true, is_train, storer):
+		"""Calculates loss for a batch of data."""
 
 	def _pre_call(self, is_train, storer):
 		if is_train:
@@ -61,20 +41,36 @@ class BaseLoss(abc.ABC):
 class BCE(BaseLoss):
 	"""
 	Compute the binary cross entropy loss.
-
-	Parameters
-	----------
 	"""
 
-	def __init__(self, **kwargs):
-		super().__init__(**kwargs)
+	def __init__(self):
+		super().__init__()
 
-	def __call__(self, y_pred, y_true, is_train, storer, **kwargs):
+	def __call__(self, y_pred, y_true, is_train, storer):
+		"""Calculates binary cross entropy loss.
+
+		Parameters
+		----------
+		y_pred: torch.Tensor
+
+
+		y_true: torch.Tensor
+
+
+		is_trin: bool
+			Whether model is training.
+
+		storer: collections.defaultdict
+			
+		"""
 		storer = self._pre_call(is_train, storer)
 
 		loss = F.binary_cross_entropy(y_pred, y_true)
 
 		if storer is not None:
-			storer['loss'].append(loss.item())
+			if is_train:
+				storer['train_loss'].append(loss.item())
+			else:
+				storer['valid_loss'].append(loss.item())
 
 		return loss

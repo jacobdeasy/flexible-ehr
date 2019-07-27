@@ -1,18 +1,16 @@
 import argparse
 import logging
-import sys
+import numpy as np
 import os
-from configparser import ConfigParser
+import sys
+import torch
 
-from torch import optim
-
-from flexehr import init_specific_model, Trainer, Evaluator
-from flexehr.utils.modelIO import save_model, load_model, load_metadata
-from flexehr.models.losses import LOSSES, get_loss_f
-from flexehr.models.models import MODELS
-from utils.datasets import get_dataloader
-from utils.helpers import (create_safe_directory, get_device, set_seed, get_n_param,
-                           FormatterNoDuplicate)
+from flexehr import Trainer
+from flexehr.utils.modelIO import load_metadata, load_model, save_model
+from flexehr.models.losses import BCE
+from flexehr.models.models import MODELS, init_model
+from utils.datasets import get_dataloaders
+from utils.helpers import get_n_param, new_model_dir, set_seed, FormatterNoDuplicate
 
 
 def parse_arguments(args_to_parse):
@@ -25,26 +23,23 @@ def parse_arguments(args_to_parse):
     general = parser.add_argument_group('General options')
     general.add_argument('name', type=str,
                          help='Name of the model for storing and loading purposes.')
-    general.add_argument('-R', '--results', type=str,
+    general.add_argument('-r', '--results', type=str,
                          default='results',
                          help='Directory to store results.')
-    general.add_argument('--progress-bar', action='store_true',
+    general.add_argument('--p-bar', action='store_true',
                          default=True,
                          help='Show progress bar.')
     general.add_argument('--cuda', action='store_true',
                          default=True,
-                         help='Disables CUDA training, even when have one.')
+                         help='Whether to use CUDA training.')
     general.add_argument('-s', '--seed', type=int,
                          default=0,
                          help='Random seed. Can be `None` for stochastic behavior.')
 
     # Learning options
-    training = parser.add_argument_group('Training specific options')
+    training = parser.add_argument_group('Training options')
     training.add_argument('data', type=str,
                           help='Path to data directory')
-    training.add_argument('--checkpoint-every', type=int,
-                          default=30,
-                          help='Save a checkpoint of the trained model every n epoch.')
     training.add_argument('-e', '--epochs', type=int,
                           default=10,
                           help='Maximum number of epochs.')
@@ -54,6 +49,9 @@ def parse_arguments(args_to_parse):
     training.add_argument('--lr', type=float,
                           default=1e-3,
                           help='Learning rate.')
+    training.add_argument('--early-stopping', type=int,
+                          default=5,
+                          help='Epochs to train without validation auroc increase.')
 
     # Model options
     model = parser.add_argument_group('Model specfic options')
@@ -61,15 +59,12 @@ def parse_arguments(args_to_parse):
                        default='Mortality',
                        choices=MODELS,
                        help='Type of decoder to use.')
-    model.add_argument('-T', '--time', type=int,
+    model.add_argument('-t', '--t_hours', type=int,
                        default=48,
                        help='ICU data time length.')
-    model.add_argument('-b', '--n_bins', type=int,
+    model.add_argument('-n', '--n_bins', type=int,
                        default=20,
                        help='Number of bins per continuous variable.')
-    model.add_argument('-n', '--n_tokens', type=int,
-                       default=36686,
-                       help='Number of unique tokens in dataset.')
     # TO-DO: Need to assert somewhere that dividing by dt produces int
     model.add_argument('--dt', type=float,
                        default=1.0,
@@ -80,25 +75,21 @@ def parse_arguments(args_to_parse):
     model.add_argument('-H', '--hidden-dim', type=int,
                        default=256,
                        help='Dimension of the LSTM hidden state.')
-    model.add_argument('-l', '--loss',
-                       default='BCE',
-                       choices=LOSSES,
-                       help='Type of loss function to use.')
+    model.add_argument('-p', '--p-dropout', type=float,
+    				   default=0.0,
+    				   help='Dropout rate.')
     model.add_argument('-w', '--weighted', type=bool,
                        default=True,
                        help='Whether to weight embeddings.')
-    model.add_argument('-d', '--dynamic', type=bool,
+    model.add_argument('-D', '--dynamic', type=bool,
                        default=True,
                        help='Whether to perform dynamic prediction.')
 
     # Evaluation options
-    evaluation = parser.add_argument_group('Evaluation specific options')
+    evaluation = parser.add_argument_group('Evaluation options')
     evaluation.add_argument('--eval', action='store_true',
                             default=False,
                             help='Whether to evaluate using pretrained model `name`.')
-    evaluation.add_argument('--metrics', action='store_true',
-                            default=False,
-                            help='Whether to compute metrics.')
     evaluation.add_argument('--test', action='store_true',
                             default=True,
                             help='Whether to compute test losses.')
@@ -119,7 +110,10 @@ def main(args):
     args: argparse.Namespace
         Arguments
     """
-    formatter = logging.Formatter('%(asctime)s %(levelname)s - %(funcName)s: %(message)s',
+
+    # Logging info
+    formatter = logging.Formatter('%(asctime)s %(levelname)s - '
+                                  '%(funcName)s: %(message)s',
                                   '%H:%M:%S')
     logger = logging.getLogger(__name__)
     logger.setLevel('INFO')
@@ -129,69 +123,62 @@ def main(args):
     logger.addHandler(stream)
 
     set_seed(args.seed)
-    device = get_device(is_gpu=args.cuda)
-    model_dir = os.path.join(RES_DIR, args.name)
-    logger.info(f'Directory for saving and loading experiments: {model_dir}')
+    device = torch.device('cuda' if torch.cuda.is_available() and args.cuda else 'cpu')
+    model_dir = os.path.join(args.results, args.name)
+    logger.info(f'Directory for saving and loading models: {model_dir}')
 
     if not args.eval:
+        # Model directory
+        new_model_dir(model_dir, logger=logger)
 
-        create_safe_directory(model_dir, logger=logger)
-
-        # Dataloader
-        train_loader = get_dataloader(args.data, args.time, args.n_bins,
-                                      dynamic=args.dynamic,
-                                      batch_size=args.bs,
-                                      logger=logger)
-        logger.info(f'Train {args.model_type} {args.time} with {len(train_loader.dataset)} samples')
+        # Dataloaders
+        train_loader, valid_loader = get_dataloaders(
+            args.data, args.t_hours, args.n_bins,
+            validation=True, dynamic=args.dynamic, batch_size=args.bs, logger=logger)
+        logger.info(f'Train {args.model_type}-{args.t_hours} with {len(train_loader.dataset)} samples')
 
         # Load model
-        model = init_specific_model(args.model_type, args.n_tokens,
-                                    args.latent_dim, args.hidden_dim,
-                                    dt=args.dt,
-                                    weighted=args.weighted,
-                                    dynamic=args.dynamic)
-        logger.info(f'Num parameters in model: {get_n_param(model)}')
+        n_tokens = len(np.load(os.path.join(args.data, f'token2index_{args.t_hours}_{args.n_bins}.npy')).item())
+        model = init_model(
+            args.model_type, n_tokens, args.latent_dim, args.hidden_dim,
+            p_dropout=args.p_dropout, dt=args.dt, weighted=args.weighted, dynamic=args.dynamic)
+        logger.info(f'#params in model: {get_n_param(model)}')
 
-        # Train
-        optimizer = optim.Adam(model.parameters(), lr=args.lr)
-
+        # Optimizer
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+        loss_f = BCE()
         model = model.to(device)
-        loss_f = get_loss_f(args.loss,
-                            n_data=len(train_loader.dataset),
-                            device=device,
-                            **vars(args))
-        trainer = Trainer(model, optimizer, loss_f,
-                          device=device,
-                          logger=logger,
-                          save_dir=model_dir,
-                          is_progress_bar=args.progress_bar)
-        trainer(train_loader,
-                epochs=args.epochs,
-                checkpoint_every=args.checkpoint_every)
+
+        # Training
+        trainer = Trainer(
+            model, loss_f, optimizer,
+            device=device, logger=logger, save_dir=model_dir, p_bar=args.p_bar)
+        trainer.train(
+        	train_loader, valid_loader,
+            epochs=args.epochs, early_stopping=args.early_stopping)
 
         # Save model
-        save_model(trainer.model, model_dir, metadata=vars(args))
+        metadata = vars(args)
+        metadata['n_tokens'] = n_tokens
+        save_model(trainer.model, model_dir, metadata=metadata)
 
-    if args.metrics or args.test:
-
+    if args.test:
+        #Load model
         model = load_model(model_dir, is_gpu=args.cuda)
         metadata = load_metadata(model_dir)
-        # TO-DO: currently uses train dataset
-        test_loader = get_dataloader(metadata['data'], metadata['time'], metadata['n_bins'],
-                                     dynamic=metadata['dynamic'],
-                                     batch_size=args.eval_bs,
-                                     shuffle=False,
-                                     logger=logger)
-        loss_f = get_loss_f(args.loss,
-                            device=device,
-                            **vars(args))
-        evaluator = Evaluator(model, loss_f,
-                              device=device,
-                              logger=logger,
-                              save_dir=model_dir,
-                              is_progress_bar=args.progress_bar)
 
-        evaluator(test_loader, is_metrics=args.metrics, is_losses=args.test)
+        # Dataloader
+        test_loader, _ = get_dataloaders(
+            metadata['data'], metadata['t_hours'], metadata['n_bins'],
+            validation=False, dynamic=metadata['dynamic'], batch_size=args.eval_bs,
+            shuffle=False, logger=logger)
+
+        # Evaluate
+        loss_f = BCE()
+        evaluator = Trainer(
+        	model, loss_f,
+            device=device, logger=logger, save_dir=model_dir, p_bar=args.p_bar)
+        evaluator._valid_epoch(test_loader)
 
 
 if __name__ == '__main__':

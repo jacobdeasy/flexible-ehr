@@ -1,7 +1,6 @@
 """
 Module containing the decoders.
 """
-import torch
 from torch import nn
 
 
@@ -23,17 +22,16 @@ class DecoderBinary(nn.Module):
 		Parameters
 		----------
 		hidden_dim : int
-			Dimensionality of LSTM hidden state
+			Dimensionality of LSTM hidden state.
 		"""
 		super(DecoderBinary, self).__init__()
 
 		self.hidden_dim = hidden_dim
 
-		# Fully connected layer
-		self.lin = nn.Linear(hidden_dim, 1)
+		self.fc = nn.Linear(hidden_dim, 1)
 
 	def forward(self, h):
-		y = self.lin(h).squeeze().sigmoid()
+		y = self.fc(h).squeeze().sigmoid()
 
 		return y
 
@@ -51,10 +49,9 @@ class DecoderRegression(nn.Module):
 
 		self.hidden_dim = hidden_dim
 
-		# Fully connected layer
-		self.lin = nn.Linear(hidden_dim, 1)
+		self.fc = nn.Linear(hidden_dim, 1)
 
 	def forward(self, h):
-		y = self.lin(h).squeeze()
+		y = self.fc(h).squeeze()
 
 		return y

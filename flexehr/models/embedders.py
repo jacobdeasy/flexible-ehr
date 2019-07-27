@@ -8,21 +8,25 @@ from torch.nn import functional as F
 from torch.nn.parameter import Parameter
 from scipy.stats import truncnorm
 
+from utils.helpers import get_device
+
 
 class Embedder(nn.Module):
-	def __init__(self, n_tokens, latent_dim,
-				 dt=1.0, weighted=True):
+	def __init__(self, n_tokens, latent_dim, dt=1.0, weighted=True):
 		"""Token embedder.
 
 		Parameters
 		----------
-		n_tokens : int
+		n_tokens: int
 			Number of tokens in vocabulary
 
-		latent_dim : int
+		latent_dim: int
 			Dimensionality of latent embedding.
 
-		weighted : bool
+		dt: float
+			Time increment between sequence steps.
+
+		weighted: bool
 			Whether or not to add embedding weights.
 		"""
 		super(Embedder, self).__init__()
@@ -32,10 +36,11 @@ class Embedder(nn.Module):
 		self.dt = dt
 		self.weighted = weighted
 
-		# Embedding layers
-		self.embeddingX = nn.Embedding(n_tokens, latent_dim, padding_idx=0)
+		self.device = get_device()
+
+		self.embedX = Embedding(n_tokens+1, latent_dim, padding_idx=0)
 		if self.weighted:
-			self.embeddingW = Embedding(n_tokens+1, 1)
+			self.embedW = Embedding(n_tokens+1, 1)
 
 	def forward(self, X):
 		T = X[:, :, 0]
@@ -47,17 +52,17 @@ class Embedder(nn.Module):
 		T = T[:, :n]
 		X = X[:, :n]
 
-		# Embed token
-		embedded = self.embeddingX(X)
+		# Embed tokens
+		embedded = self.embedX(X)
 
-		# Extract relevant weights (and keep them positive)
+		# Extract token weights (and keep them positive)
 		if self.weighted:
-			w = torch.exp(self.embeddingW(X))
+			w = torch.exp(self.embedW(X))
 
 		# Step through sequence
 		output = []
-		for t in torch.arange(0, t_max, self.dt, dtype=torch.float32).cuda():
-			t_idx = ((t <= T) & (T < t+1)).unsqueeze(2).float()
+		for t in torch.arange(0, t_max, self.dt, dtype=torch.float32).to(self.device):
+			t_idx = ((t <= T) & (T < t+1)).float().unsqueeze(2)
 			counts = t_idx.sum(dim=1, keepdim=True)
 
 			if self.weighted:
@@ -72,24 +77,19 @@ class Embedder(nn.Module):
 		return output
 
 
-# HELPERS
+# HELPER CLASS
 class Embedding(nn.Module):
-	def __init__(self, num_embeddings, embedding_dim,
-			padding_idx=None, p_keep=None, init='truncnorm'):
+	def __init__(self, n_tokens, latent_dim,
+				 padding_idx=None, init='truncnorm'):
 		super(Embedding, self).__init__()
-		self.num_embeddings = num_embeddings
-		self.embedding_dim = embedding_dim
+		self.n_tokens = n_tokens
+		self.latent_dim = latent_dim
 		if padding_idx is not None:
 			if padding_idx > 0:
-				assert padding_idx < self.num_embeddings, \
-					'padding_idx must be within num_embeddings'
+				assert padding_idx < self.n_tokens, 'padding_idx must be within n_tokens'
 			elif padding_idx < 0:
-				assert padding_idx >= -self.num_embeddings, \
-					'padding_idx must be within num_embeddings'
+				assert padding_idx >= -self.n_tokens, 'padding_idx must be within n_tokens'
 		self.padding_idx = padding_idx
-		if p_keep is not None:
-			self.keep_mask = torch.Tensor(num_embeddings, 1) 
-		self.p_keep = p_keep
 		self.init = init
 
 		self.reset_parameters()
@@ -97,22 +97,18 @@ class Embedding(nn.Module):
 	def reset_parameters(self):
 		with torch.no_grad():
 			if self.init == 'truncnorm':
-				t = 1. / (self.num_embeddings ** (1 / 2))
-				weight = truncnorm.rvs(-t, t, size=[self.num_embeddings, self.embedding_dim])
-				self.weight = Parameter(torch.tensor(weight).float())
-			elif self.init == 'ones':
-				self.weight = Parameter(torch.Tensor(self.num_embeddings, self.embedding_dim))
-				self.weight.fill_(1.0)
+				t = 1. / (self.n_tokens ** (1 / 2))
+				weights = truncnorm.rvs(-t, t, size=[self.n_tokens, self.latent_dim])
+				self.weights = Parameter(torch.tensor(weights).float())
+			elif self.init == 'zeros':
+				self.weights = Parameter(torch.Tensor(self.n_tokens, self.latent_dim))
+				self.weights.fill_(1.0)
+
 		if self.padding_idx is not None:
 			with torch.no_grad():
-				self.weight[self.padding_idx].fill_(0)
+				self.weights[self.padding_idx].zero_()
 
 	def forward(self, x):
-		if self.training and self.p_keep is not None:
-			batch_weights = self.weight * self.keep_mask.bernoulli_(self.p_keep)
-			batch_weights = batch_weights / self.p_keep  # Scale embedding like normal dropout???
-			x = F.embedding(x, batch_weights, padding_idx=0)
-		else:
-			x = F.embedding(x, self.weight, padding_idx=0)
+		x = F.embedding(x, self.weights, padding_idx=self.padding_idx)
 
 		return x

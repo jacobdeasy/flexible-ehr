@@ -23,8 +23,9 @@ class LSTM(nn.Module):
 
 		self.input_dim = input_dim
 		self.hidden_dim = hidden_dim
+		self.layer_norm = layer_norm
 
-		self.lstm_cell = LSTMCell(input_dim, hidden_dim, layer_norm=layer_norm)
+		self.lstm_cell = LSTMCell(input_dim, hidden_dim, layer_norm=self.layer_norm)
 
 	def forward(self, x):
 		h = torch.zeros(x.size(0), self.hidden_dim, dtype=torch.float32).cuda()
@@ -87,9 +88,9 @@ class LSTMCell(nn.Module):
 			preact = self.i2h(x) + self.h2h(h)
 
 		# activations
-		gates = preact[:, :3 * self.hidden_dim].sigmoid()
+		gates = preact[:, :-self.hidden_dim].sigmoid()
 		f_t = gates[:, :self.hidden_dim]
-		i_t = gates[:, self.hidden_dim:2 * self.hidden_dim]
+		i_t = gates[:, self.hidden_dim:-self.hidden_dim]
 		o_t = gates[:, -self.hidden_dim:]
 		g_t = preact[:, -self.hidden_dim:].tanh()
 

@@ -1,59 +1,75 @@
-import abc
 import logging
 import os
 import numpy as np
-from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader, Dataset
+from sklearn.model_selection import train_test_split
 
 
-def get_dataloader(root, time, bins, dt=1.0, dynamic=True,
+def get_dataloaders(data, t_hours, n_bins, validation, dt=1.0, dynamic=True,
 				   shuffle=True, pin_memory=True, batch_size=128,
-				   logger=logging.getLogger(__name__), **kwargs):
-	"""A generic data loader
+				   logger=logging.getLogger(__name__)):
+	"""A generic data loader.
 
 	Parameters
 	----------
-	dataset : str
-		Path to dataset.
+	data: str
+		Data directory.
 
-	root : 
+	t_hours: int
+
+
+	n_bins: int
+
+
+	validation: bool
+		Whether or not to return a validation DataLoader also (when training).
+
+	dt: float, optional
+		Time step between intervals.
+
+	dynamic: bool, optional
+		Whether the model should predict in a dynamic fashion.
+
+	shuffle: bool, optional
+		Whether to shuffle data during training.
+
+	pin_memory: bool, optional
+		Whether to pin memory in the GPU when using CUDA.
+
+	batch_size: int, optional
+
+	logger: logging.Logger, optional
 	"""
 	pin_memory = pin_memory and torch.cuda.is_available
-	dataset = EHR(root, time, bins, dt=dt, dynamic=dynamic, logger=logger)
 
-	return DataLoader(dataset,
-					  batch_size=batch_size,
-					  shuffle=shuffle,
-					  pin_memory=pin_memory,
-					  **kwargs)
+	arrs = np.load(os.path.join(data, f'arrs_{t_hours}_{n_bins}.npy')).item()
 
+	if validation:
+		X_train, X_valid, y_train, y_valid = train_test_split(
+			arrs['X_train'], arrs['Y_train'], test_size=0.1, stratify=arrs['Y_train'])
+		train_dataset = EHR(X_train, y_train, t_hours, dt, dynamic)
+		valid_dataset = EHR(X_valid, y_valid, t_hours, dt, dynamic)
 
-class AbstractDataset(Dataset, abc.ABC):
-	"""Base Class for the EHR dataset.
+		train_dataloader = DataLoader(train_dataset,
+									  batch_size=batch_size,
+									  shuffle=shuffle,
+									  pin_memory=pin_memory)
+		valid_dataloader = DataLoader(valid_dataset,
+									  batch_size=batch_size,
+									  shuffle=False,
+									  pin_memory=pin_memory)
 
-	Parameters
-	----------
-	root : str
-		Root directory of dataset.
-	"""
+		return train_dataloader, valid_dataloader
 
-	def __init__(self, root, time, bins, logger=logging.getLogger(__name__)):
-		self.root = root
-		self.train_data = os.path.join(root, f'train_{time}_{bins}.npy')
-		self.logger = logger
+	else:
+		test_dataset = EHR(arrs['X_test'], arrs['Y_test'], t_hours, dt, dynamic)
+		test_dataloader = DataLoader(test_dataset,
+									 batch_size=batch_size,
+									 shuffle=False,
+									 pin_memory=pin_memory)
 
-	def __len__(self):
-		return len(self.seqs)
-
-	def __getitem__(self, idx):
-		"""Get the sequence of `idx`.
-
-		Return
-		------
-		sample : torch.Tensor
-			Tensor of shape (10000, 2)."""
-		pass
+		return test_dataloader, None
 
 
 class EHR(Dataset):
@@ -62,63 +78,38 @@ class EHR(Dataset):
 
 	Parameters
 	----------
-	data : string
-		Data directory.
+	X: numpy.ndarray
+		Array containing patient sequences, shape (n_patients, 10000, 2)
+
+	Y: numpy.ndarray
+		Array containing patient outcomes, shape (n_patients,)
+
+	t_hours: int, optional
+
+
+	dt: float, optional
+		Time step between intervals.
+
+	dynamic: bool, optional
+		Whether the model should predict in a dynamic fashion.
+
+	logger: logging.Logger, optional
 	"""
 
-	def __init__(self, data, time, bins, dt=1.0, dynamic=True,
+	def __init__(self, X, Y, t_hours=48, dt=1.0, dynamic=True,
 				 logger=logging.getLogger(__name__)):
 
-		self.data = data
-		self.train_data = os.path.join(data, f'train_{time}_{bins}.npy')
 		self.logger = logger
 
-		dataset_dict = np.load(self.train_data).item()
-		labels = dataset_dict['labels'].astype(np.float32)
-		if dynamic:
-			labels = np.tile(labels[:, None], (1, int(time / dt)))
+		self.X = torch.tensor(X)
+		if dynamic:  # shape (n_patients,) -> (n_patients, n_intervals)
+			Y = np.tile(Y[:, None], (1, int(t_hours / dt)))
+		self.Y = torch.tensor(Y).float()
 
-		self.labels = torch.tensor(labels)
-		self.seqs = torch.tensor(dataset_dict['seqs'])
-		self.len = len(self.seqs)
+		self.len = len(self.X)
 
 	def __len__(self):
 		return self.len
 
 	def __getitem__(self, idx):
-		seq = self.seqs[idx]
-		label = self.labels[idx]
-
-		return seq, label
-
-
-# class EHR(AbstractDataset):
-# 	"""EHR Dataset.
-
-# 	Parameters
-# 	----------
-# 	root : string
-# 		Root directory of dataset.
-# 	"""
-# 	def __init__(self, root, time, bins, dt=1.0, dynamic=True, **kwargs):
-# 		super().__init__(root, time, bins, **kwargs)
-
-# 		dataset_dict = np.load(self.train_data).item()
-# 		self.seqs = torch.tensor(dataset_dict['seqs'])
-# 		labels = dataset_dict['labels'].astype(np.float32)
-# 		if dynamic:
-# 			labels = np.tile(labels[:, None], (1, int(time / dt)))
-# 		self.labels = torch.tensor(labels)
-
-# 	def __getitem__(self, idx):
-# 		"""Get the sequence of `idx`.
-
-# 		Return
-# 		------
-# 		sample : torch.Tensor
-# 			Tensor of shape (10000, 2).
-# 		"""
-# 		seq = self.seqs[idx]
-# 		label = self.labels[idx]
-
-# 		return seq, label
+		return self.X[idx], self.Y[idx]
