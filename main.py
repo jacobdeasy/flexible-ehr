@@ -41,7 +41,7 @@ def parse_arguments(args_to_parse):
     training.add_argument('data', type=str,
                           help='Path to data directory')
     training.add_argument('-e', '--epochs', type=int,
-                          default=10,
+                          default=20,
                           help='Maximum number of epochs.')
     training.add_argument('-bs', type=int,
                           default=128,
@@ -124,7 +124,9 @@ def main(args):
 
     set_seed(args.seed)
     device = torch.device('cuda' if torch.cuda.is_available() and args.cuda else 'cpu')
-    model_dir = os.path.join(args.results, args.name)
+    model_name = f'{args.name}_lr{args.lr}_z{args.latent_dim}_H{args.hidden_dim}' \
+    			 + f'_p{args.p_dropout}'
+    model_dir = os.path.join(args.results, model_name)
     logger.info(f'Directory for saving and loading models: {model_dir}')
 
     if not args.eval:
