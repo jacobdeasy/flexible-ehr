@@ -1,9 +1,4 @@
-import argparse
-import logging
-import numpy as np
-import os
-import sys
-import torch
+import argparse, logging, numpy as np, os, sys, torch
 
 from flexehr import Trainer
 from flexehr.utils.modelIO import load_metadata, load_model, save_model
@@ -72,7 +67,7 @@ def parse_arguments(args_to_parse):
     model.add_argument('-z', '--latent-dim', type=int,
                        default=32,
                        help='Dimension of the token embedding.')
-    model.add_argument('-H', '--hidden-dim', type=int,
+    model.add_argument('-h', '--hidden-dim', type=int,
                        default=256,
                        help='Dimension of the LSTM hidden state.')
     model.add_argument('-p', '--p-dropout', type=float,
@@ -124,7 +119,7 @@ def main(args):
 
     set_seed(args.seed)
     device = torch.device('cuda' if torch.cuda.is_available() and args.cuda else 'cpu')
-    model_name = f'{args.name}_lr{args.lr}_z{args.latent_dim}_H{args.hidden_dim}' \
+    model_name = f'{args.name}_lr{args.lr}_z{args.latent_dim}_h{args.hidden_dim}' \
     			 + f'_p{args.p_dropout}'
     model_dir = os.path.join(args.results, model_name)
     logger.info(f'Directory for saving and loading models: {model_dir}')
