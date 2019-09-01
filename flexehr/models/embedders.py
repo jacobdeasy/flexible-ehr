@@ -41,6 +41,7 @@ class Embedder(nn.Module):
 		self.embedX = Embedding(n_tokens+1, latent_dim, padding_idx=0)
 		if self.weighted:
 			self.embedW = Embedding(n_tokens+1, 1)
+			self.softmax = nn.Softmax(dim=1)
 
 	def forward(self, X):
 		T = X[:, :, 0]
@@ -57,7 +58,8 @@ class Embedder(nn.Module):
 
 		# Extract token weights (and keep them positive)
 		if self.weighted:
-			w = torch.exp(self.embedW(X))
+			w = self.embedW(X)
+			w = torch.exp(w)
 
 		# Step through sequence
 		output = []
@@ -66,18 +68,20 @@ class Embedder(nn.Module):
 			counts = t_idx.sum(dim=1, keepdim=True)
 
 			if self.weighted:
-				X_t = t_idx * w * embedded
+				w_t = t_idx * w
+				X_t = w_t * embedded
 			else:
 				X_t = t_idx * embedded
 
 			X_t_avg = X_t.sum(dim=1, keepdim=True) / (counts + 1e-6)
 			output += [X_t_avg]
+
 		output = torch.cat(output, dim=1)
 
 		return output
 
 
-# HELPER CLASS
+# HELPERS
 class Embedding(nn.Module):
 	def __init__(self, n_tokens, latent_dim,
 				 padding_idx=None, init='truncnorm'):

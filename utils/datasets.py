@@ -47,7 +47,7 @@ def get_dataloaders(data, t_hours, n_bins, validation, dt=1.0, dynamic=True,
 
 	if validation:
 		X_train, X_valid, y_train, y_valid = train_test_split(
-			arrs['X_train'], arrs['Y_train'], test_size=0.1, stratify=arrs['Y_train'])
+			arrs['X_train'], arrs['Y_train'], test_size=1000, stratify=arrs['Y_train'])
 		train_dataset = EHR(X_train, y_train, t_hours, dt, dynamic)
 		valid_dataset = EHR(X_valid, y_valid, t_hours, dt, dynamic)
 

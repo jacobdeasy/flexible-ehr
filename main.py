@@ -67,7 +67,7 @@ def parse_arguments(args_to_parse):
     model.add_argument('-z', '--latent-dim', type=int,
                        default=32,
                        help='Dimension of the token embedding.')
-    model.add_argument('-h', '--hidden-dim', type=int,
+    model.add_argument('-H', '--hidden-dim', type=int,
                        default=256,
                        help='Dimension of the LSTM hidden state.')
     model.add_argument('-p', '--p-dropout', type=float,
