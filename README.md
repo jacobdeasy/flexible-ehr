@@ -5,10 +5,11 @@ Python suite to reproduce the results presented in **Time-Sensitive Deep Learnin
 
 ## News
 
-* **2019 June 14**: This work was accepted as a conference abstract and chosen for a talk the 32nd Annual congress of the European Society of Intensive Care Medicine in Berlin ([ESICM LIVES 2019](https://www.esicm.org/events/32nd-annual-congress-berlin/)).
+* **2019 June 14:** This work was accepted as a conference abstract and chosen for a talk the 32nd Annual congress of the European Society of Intensive Care Medicine in Berlin ([ESICM LIVES 2019](https://www.esicm.org/events/32nd-annual-congress-berlin/)).
+* **2019 October 01:** This work was present at the ESICM conference in Berlin as part of the track *From bytes to bedside: Improving intensive care with Data*.
 
 ## Citation
-If you use this code or the paper in your research, please cite the following publication: *Jacob Deasy, Pietro Liò, and Ari Ercole. Time-Sensitive Deep Learning for ICU Outcome Prediction Without Variable Selection or Cleaning. **ARXIV CODE TBC*** which is now available at **LINK TBC**.
+If you use this code or the paper in your research, please cite the following publication: *Jacob Deasy, Pietro Liò, and Ari Ercole. Time-Sensitive Deep Learning for ICU Outcome Prediction Without Variable Selection or Cleaning. arXiv preprint arXiv:1909.08981*
 
 ## TLDR
 Clone the repo and simply run the following (NB. this may take several hours and requires 30GB storage on top of the space required for the MIMIC III csv files):
@@ -18,6 +19,8 @@ Clone the repo and simply run the following (NB. this may take several hours and
         ./bin/plot_48_20.sh
 
 ## Plots
+
+**TBC**
 
 ## Motivation
 
