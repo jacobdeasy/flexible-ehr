@@ -1,3 +1,5 @@
+"""Check the maximum length of stay of donors in MIMIC-III.
+If it is <48 it does not affect our study."""
 
 import os
 import pandas as pd
@@ -18,3 +20,7 @@ for od in ods:
         pass
 
 print(max(los_list))
+
+"""
+Result: 37.2832
+"""
