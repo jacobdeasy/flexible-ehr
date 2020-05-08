@@ -1,3 +1,5 @@
+"""Model Input/Output module."""
+
 import json
 import numpy as np
 import os
@@ -29,9 +31,14 @@ def save_model(model, directory, metadata=None, filename='model.pt'):
     model.cpu()
 
     if metadata is None:
-        metadata = dict(n_tokens=model.n_tokens, latent_dim=model.latent_dim,
-                        hidden_dim=model.hidden_dim, model_type=model.model_type,
-                        dt=model.dt, weighted=model.weighted)
+        metadata = dict(
+            n_tokens=model.n_tokens,
+            latent_dim=model.latent_dim,
+            hidden_dim=model.hidden_dim,
+            model_type=model.model_type,
+            dt=model.dt,
+            weighted=model.weighted
+        )
 
     save_metadata(metadata, directory)
 
@@ -90,14 +97,14 @@ def load_model(directory, is_gpu=True, filename='model.pt'):
     """
     device = get_device(is_gpu=is_gpu)
     metadata = load_metadata(directory)
-    path_to_model = os.path.join(directory, filename)
 
     model = init_model(metadata['model_type'], metadata['n_tokens'],
                        metadata['latent_dim'], metadata['hidden_dim'],
                        dt=metadata['dt'], weighted=metadata['weighted'],
                        dynamic=metadata['dynamic']).to(device)
 
-    model.load_state_dict(torch.load(os.path.join(directory, filename)), strict=False)
+    model.load_state_dict(
+        torch.load(os.path.join(directory, filename)), strict=False)
     model.eval()
 
     return model
@@ -137,10 +144,12 @@ def numpy_serialize(obj):
 
 def save_np_arrays(arrays, directory, filename):
     """Save dictionary of arrays in json file."""
-    save_metadata(arrays, directory, filename=filename, default=numpy_serialize)
+    save_metadata(arrays, directory,
+                  filename=filename, default=numpy_serialize)
 
 
 def load_np_arrays(directory, filename):
     """Load dictionary of arrays from json file."""
     arrays = load_metadata(directory, filename=filename)
+
     return {k: np.array(v) for k, v in arrays.items()}

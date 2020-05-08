@@ -1,3 +1,5 @@
+"""Helpers module."""
+
 import argparse
 import numpy as np
 import os
@@ -16,7 +18,8 @@ def array(x):
 
 def get_device(is_gpu=True):
     """Return the correct device"""
-    return torch.device('cuda' if torch.cuda.is_available() and is_gpu else 'cpu')
+    return torch.device(
+        'cuda' if torch.cuda.is_available() and is_gpu else 'cpu')
 
 
 def get_model_device(model):
@@ -36,7 +39,8 @@ def new_model_dir(directory, logger=None):
     """Create a directory and archive the previous one if already existed."""
     if os.path.exists(directory):
         if logger is not None:
-            logger.warning(f'{directory} already exists. Archiving to {directory}.zip')
+            logger.warning(
+                f'{directory} already exists. Archiving to {directory}.zip')
         shutil.make_archive(directory, 'zip', directory)
         shutil.rmtree(directory)
     os.makedirs(directory)

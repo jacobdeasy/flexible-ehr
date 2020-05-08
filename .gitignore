@@ -1,0 +1,19 @@
+.vscode
+
+# directories
+data/
+plot/*
+results/*
+figs/
+
+# Byte-compiled / optimized
+*pyc
+__pycache__/
+.DS_Store
+
+# extensions
+*.log
+*.pyc
+*.sh
+*.tar
+*.zip

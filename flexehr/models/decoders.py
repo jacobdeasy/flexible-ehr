@@ -4,54 +4,59 @@ Module containing the decoders.
 from torch import nn
 
 
-DECODER_DICT = {'Mortality': 'Binary', 'Readmission': 'Binary',
-				'LOS': 'Regression', 'LOS7': 'Binary'}
+DECODER_DICT = {
+    'Mortality': 'Binary',
+    'Readmission': 'Binary',
+    'LOS': 'Regression',
+    'LOS7': 'Binary'
+}
 
 
 # All decoders should be called Decoder<Model>
 def get_decoder(model_type):
-	model_type = model_type.lower().capitalize()
-	model_type = DECODER_DICT[model_type]
-	return eval(f'Decoder{model_type}')
+    model_type = model_type.lower().capitalize()
+    model_type = DECODER_DICT[model_type]
+
+    return eval(f'Decoder{model_type}')
 
 
 class DecoderBinary(nn.Module):
-	def __init__(self, hidden_dim):
-		"""Hidden state decoder for binary classification tasks.
+    def __init__(self, hidden_dim):
+        """Hidden state decoder for binary classification tasks.
 
-		Parameters
-		----------
-		hidden_dim : int
-			Dimensionality of LSTM hidden state.
-		"""
-		super(DecoderBinary, self).__init__()
+        Parameters
+        ----------
+        hidden_dim : int
+            Dimensionality of LSTM hidden state.
+        """
+        super(DecoderBinary, self).__init__()
 
-		self.hidden_dim = hidden_dim
+        self.hidden_dim = hidden_dim
 
-		self.fc = nn.Linear(hidden_dim, 1)
+        self.fc = nn.Linear(hidden_dim, 1)
 
-	def forward(self, h):
-		y = self.fc(h).squeeze().sigmoid()
+    def forward(self, h):
+        y = self.fc(h).squeeze().sigmoid()
 
-		return y
+        return y
 
 
 class DecoderRegression(nn.Module):
-	def __init__(self, hidden_dim):
-		"""Hidden state decoder for regression tasks.
+    def __init__(self, hidden_dim):
+        """Hidden state decoder for regression tasks.
 
-		Parameters
-		----------
-		hidden_dim : int
-			Dimensionality of LSTM hidden state
-		"""
-		super(DecoderRegression, self).__init__()
+        Parameters
+        ----------
+        hidden_dim : int
+            Dimensionality of LSTM hidden state
+        """
+        super(DecoderRegression, self).__init__()
 
-		self.hidden_dim = hidden_dim
+        self.hidden_dim = hidden_dim
 
-		self.fc = nn.Linear(hidden_dim, 1)
+        self.fc = nn.Linear(hidden_dim, 1)
 
-	def forward(self, h):
-		y = self.fc(h).squeeze()
+    def forward(self, h):
+        y = self.fc(h).squeeze()
 
-		return y
+        return y

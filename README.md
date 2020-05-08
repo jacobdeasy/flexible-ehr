@@ -14,7 +14,7 @@ If you use this code or the paper in your research, please cite the following pu
 ## TLDR
 Clone the repo and simply run the following (NB. this may take several hours and requires 30GB storage on top of the space required for the MIMIC III csv files):
 
-        ./bin/preprocessing.sh
+        ./bin/collect_tokens.sh  {PATH TO MIMIC-III CSVs}
         ./bin/train_48_20.sh
         ./bin/plot_48_20.sh
 
