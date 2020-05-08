@@ -1,7 +1,7 @@
 .vscode
 
 # directories
-data/
+data/root
 results/*
 figs/
 
@@ -16,3 +16,4 @@ __pycache__/
 *.sh
 *.tar
 *.zip
+*.csv
