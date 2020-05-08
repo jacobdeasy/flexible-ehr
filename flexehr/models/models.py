@@ -103,8 +103,6 @@ class Model(nn.Module):
         self.lstm = LSTM(self.latent_dim, self.hidden_dim)
         self.decoder = decoder(self.hidden_dim)
 
-        self.reset_parameters()
-
     def forward(self, input):
         """
         Forward pass of model.

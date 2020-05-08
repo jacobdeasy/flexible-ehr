@@ -9,15 +9,15 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
 
-def get_dataloaders(data, t_hours, n_bins, validation, dt=1.0, dynamic=True,
+def get_dataloaders(root, t_hours, n_bins, validation, dt=1.0, dynamic=True,
                     shuffle=True, pin_memory=True, batch_size=128,
                     logger=logging.getLogger(__name__)):
     """A generic data loader.
 
     Parameters
     ----------
-    data: str
-        Data directory.
+    root: str
+        Root directory.
 
     t_hours: int
 
@@ -46,11 +46,14 @@ def get_dataloaders(data, t_hours, n_bins, validation, dt=1.0, dynamic=True,
     """
     pin_memory = pin_memory and torch.cuda.is_available
 
-    arrs = np.load(os.path.join(data, f'arrs_{t_hours}_{n_bins}.npy')).item()
+    arrs = np.load(
+        os.path.join(root, '_dicts', f'{t_hours}_{n_bins}_arrs.npy'),
+        allow_pickle=True).item()
 
     if validation:
         X_train, X_valid, y_train, y_valid = train_test_split(
-            arrs['X_train'], arrs['Y_train'], test_size=1000, stratify=arrs['Y_train'])
+            arrs['X_train'], arrs['Y_train'],
+            test_size=1000, stratify=arrs['Y_train'])
         train_dataset = EHR(X_train, y_train, t_hours, dt, dynamic)
         valid_dataset = EHR(X_valid, y_valid, t_hours, dt, dynamic)
 
@@ -66,7 +69,8 @@ def get_dataloaders(data, t_hours, n_bins, validation, dt=1.0, dynamic=True,
         return train_dataloader, valid_dataloader
 
     else:
-        test_dataset = EHR(arrs['X_test'], arrs['Y_test'], t_hours, dt, dynamic)
+        test_dataset = EHR(
+            arrs['X_test'], arrs['Y_test'], t_hours, dt, dynamic)
         test_dataloader = DataLoader(test_dataset,
                                      batch_size=batch_size,
                                      shuffle=False,

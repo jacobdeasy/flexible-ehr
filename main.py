@@ -24,7 +24,8 @@ def parse_arguments(args_to_parse):
 
     # General options
     general = parser.add_argument_group('General options')
-    general.add_argument('name', type=str,
+    general.add_argument('name',
+                         type=str,
                          help='Name of the model for storing and loading.')
     general.add_argument('-r', '--results',
                          type=str, default='results',
@@ -51,7 +52,7 @@ def parse_arguments(args_to_parse):
                           type=int, default=128,
                           help='Batch size for training.')
     training.add_argument('--lr',
-                          type=float, default=1e-3,
+                          type=float, default=5e-4,
                           help='Learning rate.')
     training.add_argument('--early-stopping',
                           type=int, default=5,
@@ -139,14 +140,14 @@ def main(args):
             validation=True, dynamic=args.dynamic,
             batch_size=args.bs, logger=logger)
         logger.info(
-            f'Train {args.model_type}-{args.t_hours}' +
+            f'Train {args.model_type}-{args.t_hours} ' +
             f'with {len(train_loader.dataset)} samples')
 
         # Load model
         n_tokens = len(np.load(
             os.path.join(
-                args.data, f'token2index_{args.t_hours}_{args.n_bins}.npy')
-            ).item())
+                args.data, '_dicts', f'{args.t_hours}_{args.n_bins}.npy'),
+            allow_pickle=True).item())
         model = init_model(
             args.model_type, n_tokens, args.latent_dim, args.hidden_dim,
             p_dropout=args.p_dropout, dt=args.dt,
@@ -179,7 +180,7 @@ def main(args):
         # Dataloader
         test_loader, _ = get_dataloaders(
             metadata['data'], metadata['t_hours'], metadata['n_bins'],
-            validation=False, dynamic=metadata['dynamic'], batch_size=1000,
+            validation=False, dynamic=metadata['dynamic'], batch_size=128,
             shuffle=False, logger=logger)
 
         # Evaluate

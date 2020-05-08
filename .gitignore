@@ -2,7 +2,6 @@
 
 # directories
 data/
-plot/*
 results/*
 figs/
 

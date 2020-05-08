@@ -22,7 +22,7 @@ class LSTM(nn.Module):
         super(LSTM, self).__init__()
 
         self.input_dim = input_dim
-        self.hidden_size = hidden_dim
+        self.hidden_dim = hidden_dim
 
         self.lstm_cell = LSTMCell(input_dim, hidden_dim)
 
