@@ -6,6 +6,7 @@ from torch import nn
 
 DECODER_DICT = {
     'Mortality': 'Binary',
+    'MortalityFFNN': 'BinaryFFNN',
     'Readmission': 'Binary',
     'LOS': 'Regression',
     'LOS7': 'Binary'
@@ -58,5 +59,34 @@ class DecoderRegression(nn.Module):
 
     def forward(self, h):
         y = self.fc(h).squeeze()
+
+        return y
+
+
+class DecoderBinaryFFNN(nn.Module):
+    def __init__(self, hidden_dim, n_layers):
+        """Hidden state decoder for binary classification tasks.
+
+        Parameters
+        ----------
+        hidden_dim : int
+            Dimensionality of LSTM hidden state.
+
+        n_layers : int
+            Number of hidden layers in FFNN decoder.
+        """
+        super(DecoderBinaryFFNN, self).__init__()
+
+        self.hidden_dim = hidden_dim
+        self.n_layers = n_layers
+
+        assert n_layers > 0
+        self.fc = [] nn.ModuleList([nn.Linear(hidden_dim, hidden_dim)])
+        for i in range(n_layers):
+            self.fc.append(nn.Linear(hidden_dim, hidden_dim))
+        self.fc.append(nn.Linear(hidden_dim, 1))
+
+    def forward(self, h):
+        y = self.fc(h).squeeze().sigmoid()
 
         return y
