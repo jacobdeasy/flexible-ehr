@@ -1,0 +1,32 @@
+\begin{tabular}{lrrrrl}
+\toprule
+          Variable &          n &     q1 &     q2 &     q3 & Unit of measurement \\
+\midrule
+         Anion gap &  431485.00 &  11.00 &  13.00 &  15.00 &               mEq/L \\
+           Albumin &   68632.00 &   2.50 &   3.00 &   3.50 &                 g/L \\
+       Bicarbonate &  438884.00 &  22.00 &  25.00 &  28.00 &               mEq/L \\
+         Bilirubin &  104367.00 &   0.40 &   0.90 &   2.40 &               mg/dL \\
+        Creatinine &  450734.00 &   0.70 &   1.00 &   1.60 &               mg/dL \\
+          Chloride &  481780.00 & 100.00 & 104.00 & 108.00 &               mEq/L \\
+      Diastolic BP & 4166196.00 &  50.00 &  59.00 &  69.00 &                mmHg \\
+         GCS Total &  641931.00 &   9.00 &  13.00 &  15.00 &                     \\
+           Glucose &  568905.00 & 100.00 & 121.00 & 150.00 &              mmol/L \\
+        Heart rate & 4262499.00 &  73.00 &  85.00 &  98.00 &             /minute \\
+        Hematocrit &  560500.00 &  27.10 &  30.10 &  33.90 &  \textbackslash \% of blood volume \\
+        Hemoglobin &  477317.00 &   9.10 &  10.20 &  11.50 &                 g/L \\
+              FiO2 &  372891.00 &  40.00 &  40.00 &  50.00 &                  \textbackslash \% \\
+           Lactate &  126034.00 &   1.20 &   1.80 &   3.00 &              mmol/L \\
+          Mean ABP & 4208706.00 &  68.00 &  77.00 &  89.00 &                mmHg \\
+          Platelet &  428028.00 & 137.00 & 210.00 & 301.00 &       1000/mm\$\textasciicircum \{3\}\$ \\
+         Potassium &  608058.00 &   3.70 &   4.10 &   4.40 &               mEq/L \\
+               PTT &  286946.00 &  28.00 &  34.00 &  51.10 &             seconds \\
+                PT &  270192.00 &  13.10 &  14.40 &  17.10 &             seconds \\
+            Sodium &  506194.00 & 136.00 & 139.00 & 141.00 &               mEq/L \\
+ Oxygen saturation & 4151164.00 &  96.00 &  98.00 &  99.00 &                   \% \\
+  Respiratory rate & 4707473.00 &  16.00 &  19.00 &  24.00 &             /minute \\
+       Systolic BP & 4179045.00 & 104.00 & 119.00 & 137.00 &                mmHg \\
+   Temperature (F) &  892931.00 &  97.60 &  98.50 &  99.50 &         \$\textasciicircum \{\textbackslash circ\}\$F \\
+               BUN &  448975.00 &  14.00 &  21.00 &  36.00 &               mg/dL \\
+               WBC &  414369.00 &   7.00 &   9.70 &  13.40 &       1000/mm\$\textasciicircum \{3\}\$ \\
+\bottomrule
+\end{tabular}
