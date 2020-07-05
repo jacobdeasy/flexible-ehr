@@ -47,8 +47,8 @@ Here are the required steps to replicate our results:
 
 2. Separate patients as described in the [MIMIC-III benchmark](https://arxiv.org/abs/1703.07771):
 
-        python -m flexehr.benchmark.extract_subjects {PATH TO MIMIC-III CSVs} data/root/
-        python -m flexehr.benchmark.validate_events data/root/
+        python -m flexehr.scripts.1_subject_events {PATH TO MIMIC-III CSVs} data/root/
+        python -m flexehr.scripts.2_validate_events data/root/
 
 3. Extract individual stays from each patient. Patient data is simply separated by admission information.
 
@@ -56,19 +56,19 @@ Here are the required steps to replicate our results:
 
     b. **No variable cleaning.**
 
-        python -m flexehr.scripts.extract_episodes_from_subjects data/root/
+        python -m flexehr.scripts.3_subject2episode data/root/
 
 4. Truncate timeseries to `t` hours and store in `data/root_t`
 
-        python -m flexehr.scripts.truncate_timeseries data/root -t 48
+        python -m flexehr.scripts.4_truncate_timeseries data/root -t 48
 
 5. Generate a dictionary of labels to value arrays from `ITEMID`s and values
 
-        python -m flexehr.scripts.generate_value_dict data -t 48
+        python -m flexehr.scripts.6_generate_value_dict data/root
 
 6. Quantize events into `n` bins based on dictionary labels to values.
 
-        python -m flexehr.scripts.quantize_events data -t 48 -n 20
+        python -m flexehr.scripts.7_quantize_events data/root -t 48 -n 20
 
 7. Create final arrays for training
 

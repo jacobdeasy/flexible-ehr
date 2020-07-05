@@ -81,7 +81,7 @@ class DecoderBinaryFFNN(nn.Module):
         self.n_layers = n_layers
 
         assert n_layers > 0
-        self.fc = [] nn.ModuleList([nn.Linear(hidden_dim, hidden_dim)])
+        self.fc = nn.ModuleList([nn.Linear(hidden_dim, hidden_dim)])
         for i in range(n_layers):
             self.fc.append(nn.Linear(hidden_dim, hidden_dim))
         self.fc.append(nn.Linear(hidden_dim, 1))

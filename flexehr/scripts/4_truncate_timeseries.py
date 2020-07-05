@@ -1,6 +1,7 @@
 """Extract episode information from validated subject directories."""
 
 import argparse
+import numpy as np
 import os
 import pandas as pd
 
@@ -9,6 +10,9 @@ from tqdm import tqdm
 
 def truncate_timeseries(in_dir, t_hours=48):
     patients = os.listdir(in_dir)
+    itemids = []
+    uoms = []
+    itemid_uoms = []
 
     for patient in tqdm(patients):
         pdir = os.path.join(in_dir, patient)
@@ -19,6 +23,7 @@ def truncate_timeseries(in_dir, t_hours=48):
             ev_file = ts_file.replace('_timeseries', '')
             events = pd.read_csv(os.path.join(pdir, ev_file))
 
+            # Ignore certain patients
             if events.shape[0] == 0:
                 print('Events shape is 0.')
                 continue
@@ -37,16 +42,25 @@ def truncate_timeseries(in_dir, t_hours=48):
             if ts.shape[0] == 0:
                 print('\tNo events in ICU.', patient, ts_file)
                 continue
-            ts['Val_key'] = \
-                ts['ITEMID'].astype(str) + '_' + ts['VALUEUOM'].astype(str)
-            ts['Reading'] = \
-                ts['ITEMID'].astype(str) + '_' + ts['VALUE'].astype(str) + \
-                '_' + ts['VALUEUOM'].astype(str)
-            ts.drop(['ITEMID', 'VALUEUOM'], axis=1, inplace=True)
 
-            # Save
-            ts.to_csv(
-                os.path.join(pdir, ts_file[:-4]+f'_{t_hours}.csv'), index=None)
+            # Val_key = ITEMID_VALUEUOM
+            ts['ITEMID'] = ts['ITEMID'].astype(str)
+            ts['VALUEUOM'] = ts['VALUEUOM'].astype(str)
+            ts['ITEMID_UOM'] = list(zip(ts['ITEMID'], ts['VALUEUOM']))
+
+            itemids += list(ts['ITEMID'].unique())
+            uoms += list(ts['VALUEUOM'].unique())
+            itemid_uoms += list(ts['ITEMID_UOM'].unique())
+
+            ts.drop(['ITEMID', 'VALUEUOM'], axis=1, inplace=True)
+            ts.to_csv(os.path.join(pdir, ts_file[:-4]+f'_{t_hours}.csv'), index=None)
+
+    itemids = list(set(itemids))
+    uoms = list(set(uoms))
+    itemid_uoms = list(set(itemid_uoms))
+    print(f'{len(itemids)} unique ITEMIDs.')
+    print(f'{len(uoms)} unique UOMs.')
+    print(f'{len(itemid_uoms)} unique pairs (ITEMID, UOM).')
 
 
 if __name__ == '__main__':

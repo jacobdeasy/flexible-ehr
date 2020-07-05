@@ -120,3 +120,41 @@ class Model(nn.Module):
             output = self.decoder(self.dropout(final_hidden))
 
         return output
+
+
+class ModelFFNN(nn.Module):
+    def __init__(self, decoder, n_tokens, latent_dim, hidden_dim,
+                 p_dropout=0.0, dt=1.0, weighted=True, dynamic=True):
+        super(Model, self).__init__()
+
+        self.n_tokens = n_tokens
+        self.latent_dim = latent_dim
+        self.hidden_dim = hidden_dim
+        self.p_dropout = p_dropout
+        self.dt = dt
+        self.weighted = weighted
+        self.dynamic = dynamic
+
+        self.embedder = Embedder(self.n_tokens, self.latent_dim,
+                                 dt=self.dt, weighted=self.weighted)
+        self.dropout = nn.Dropout(self.p_dropout)
+        self.lstm = LSTM(self.latent_dim, self.hidden_dim)
+        self.decoder = decoder(self.hidden_dim)
+
+    def forward(self, input):
+        """
+        Forward pass of model.
+
+        Parameters
+        ----------
+        input: torch.Tensor
+            Batch of data. Shape (batch_size, 10000, 2)
+        """
+        emb = self.dropout(F.relu(self.embedder(input)))
+        all_hidden, (final_hidden, _) = self.lstm(emb)
+        if self.dynamic:
+            output = self.decoder(self.dropout(all_hidden))
+        else:
+            output = self.decoder(self.dropout(final_hidden))
+
+        return output
