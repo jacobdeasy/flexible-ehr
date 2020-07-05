@@ -10,6 +10,11 @@ from tqdm import tqdm
 
 def truncate_timeseries(in_dir, t_hours=48):
     patients = os.listdir(in_dir)
+
+    patient_count = 0
+    stay_count = 0
+    event_count = 0
+
     itemids = []
     uoms = []
     itemid_uoms = []
@@ -18,6 +23,8 @@ def truncate_timeseries(in_dir, t_hours=48):
         pdir = os.path.join(in_dir, patient)
         patient_ts_files = list(filter(
             lambda x: x.find('timeseries.csv') != -1, os.listdir(pdir)))
+
+        stay_count_inner = 0
 
         for i, ts_file in enumerate(patient_ts_files):
             ev_file = ts_file.replace('_timeseries', '')
@@ -54,6 +61,18 @@ def truncate_timeseries(in_dir, t_hours=48):
 
             ts.drop(['ITEMID', 'VALUEUOM'], axis=1, inplace=True)
             ts.to_csv(os.path.join(pdir, ts_file[:-4]+f'_{t_hours}.csv'), index=None)
+
+            stay_count_inner += 1
+            stay_count += 1
+            event_count += len(ts)
+
+        if stay_count_inner > 0:
+            patient_count += 1
+
+    # Output info
+    print(f'{patient_count} patients')
+    print(f'{stay_count} stays')
+    print(f'{event_count} events')
 
     itemids = list(set(itemids))
     uoms = list(set(uoms))
