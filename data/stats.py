@@ -166,14 +166,19 @@ ITEMIDS_LIST = [
 def gen_stats(hours):
     patients = os.listdir('root')[:-1]
 
-    total_event_count = 0
+    patient_count = len(patients)
+    stay_count = 0
+    event_count = 0
+
     variable_counts = np.zeros(len(ITEMIDS_LIST))
     arrs = [[] for _ in range(len(ITEMIDS_LIST))]
 
     for patient in tqdm(patients):
         df = pd.read_csv(os.path.join('root', patient, 'events.csv'))
+        stay_df = pd.read_csv(os.path.join('root', patient, 'stays.csv'))
 
-        total_event_count += len(df)
+        event_count += len(df)
+        stay_count += len(stay_df)
 
         for i, itemids in enumerate(ITEMIDS_LIST):
             s = df.loc[df['ITEMID'].isin(itemids)]['VALUE']
@@ -196,6 +201,10 @@ def gen_stats(hours):
         columns=['Variable', 'n', 'q1', 'q2', 'q3', 'Unit of measurement'])
     df.to_csv('variable_stats.csv', index=None)
     df.to_latex(buf='table.txt', index=False, float_format='{:.2f}'.format)
+
+    print(f'{patient_count} patients')
+    print(f'{stay_count} stays')
+    print(f'{event_count} events')
 
 
 if __name__ == '__main__':
