@@ -25,7 +25,7 @@ from tqdm import tqdm
 #         except:
 #             return False
 
-def continuous(v):
+def try_to_float(v):
     try:
         return float(v)
     except:
@@ -43,8 +43,7 @@ def generate_value_dict(root, seed=0):
     seed: int
         Random seed.
     """
-    train_info = pd.read_csv(os.path.join(root, 'numpy', f'{seed}-train.csv'))
-    train_files = train_info['Paths']
+    train_files = pd.read_csv(os.path.join(root, 'numpy', f'{seed}-train.csv'))['Paths']
 
     d = {}
 
@@ -55,29 +54,24 @@ def generate_value_dict(root, seed=0):
             k = ts.loc[i, 'ITEMID_UOM']
             v = ts.loc[i, 'VALUE']
 
+            if k not in d.keys():
+                d[k] = {}
+                d[k]['disc'] = []
+                d[k]['cont'] = []
+
             if isna:
-                k = k + ' nan'
-                if k not in d.keys():
-                    d[k] = {}
-                    d[k]['CONT'] = False
+                if 'nan' not in d[k]['disc']:
+                    d[k]['disc'] += [str(v)]
             else:
-                v = continuous(v)
+                v = try_to_float(v)
                 if isinstance(v, str):
-                    k = k + ' str'
-                    if k not in d.keys():
-                        d[k] = {}
-                        d[k]['CONT'] = False
+                    d[k]['disc'] += [v]
                 else:
-                    if k not in d.keys():
-                        d[k] = {}
-                        d[k]['CONT'] = False
-                        d[k]['array'] = [float(v)]
-                    else:
-                        d[k]['array'] += [float(v)]
+                    d[k]['cont'] += [v]
 
     for k, v in d.items():
-        if d[k]['CONT']:
-            d[k]['array'] = np.array(d[k]['array'])
+        if 'cont' in d[k]:
+            d[k]['cont'] = np.array(d[k]['cont'])
 
     if not os.path.exists(os.path.join(root, 'numpy')):
         os.makedirs(os.path.join(root, 'numpy'))

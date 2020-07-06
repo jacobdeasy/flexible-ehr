@@ -26,29 +26,32 @@ def quantize_events(root, n_bins, V, seed=0):
         Random seed.
     """
     # To avoid multiple bins per value,
-    # remove all {key: values} pairs where: |unique(values)| < n_bins
+    # remove all {key: values} pairs if:
+    # - discrete
+    # - contiinuous, but |unique(values)| < n_bins
     print(len(V))
     V_full = V.copy()
-    for key, vals in V_full.items():
-        if len(np.unique(vals)) < n_bins:
-            del V[key]
-    print(len(V))
-
-    # Generate percentiles
-    print('\nGenerating percentiles...')
     P = []
-    for vals in tqdm(V.values()):
-        P += [np.percentile(
-            vals, np.arange(0, 100 + (100 // n_bins), 100 // n_bins))]
+    for key, subdict in V_full.items():
+        if len(subdict['cont']) > 0:
+            if len(np.unique(subdict['cont'])) < n_bins:
+                del V[key]
+            else:
+                # Generate percentiles
+                P += [np.percentile(subdict['cont'], np.arange(0, 100 + (100 // n_bins), 100 // n_bins))]
+        else:
+            del V[key]
+    assert len(V) == len(P)
     P = dict(zip(V.keys(), P))
+    print(len(P))
 
     def tokenize(row):
         """
-        Unseen (ITEM, UOM) pairs mapped to <UNKNOWN> token.
+        Unseen (ITEM, UOM) pairs mapped to <UNK> token.
         Seen item_uom pairs binned if continuous.
         """
         if row['ITEMID_UOM'] in V_full:
-            if row['CONT'] and row['ITEMID_UOM'] in P:
+            if row['ITEMID_UOM'] in P and row['VALUE'] in V[row['ITEMID_UOM']]['cont']:
                 pctiles = P[row['ITEMID_UOM']]
                 posdiff = ((pctiles - float(row['VALUE'])) > 0).astype(int)
                 pct = (posdiff[1:] - posdiff[:-1]).argmax()
@@ -56,26 +59,20 @@ def quantize_events(root, n_bins, V, seed=0):
             else:
                 return row['ITEMID_UOM'] + ': ' + str(row['VALUE'])
         else:
-            return '<UNKNOWN>'
+            return '<UNK>'
 
     print('Creating tokens based on percentiles...')
     train_files = pd.read_csv(os.path.join(root, 'numpy', f'{seed}-train.csv'))['Paths']
-    valid_info = pd.read_csv(os.path.join(root, 'numpy', f'{seed}-valid.csv'))['Paths']
-    test_info = pd.read_csv(os.path.join(root, 'numpy', f'{seed}-test.csv'))['Paths']
-
-    ### SOME ARE IN SOME SPLITS, OTHERS AREN'T
+    valid_files = pd.read_csv(os.path.join(root, 'numpy', f'{seed}-valid.csv'))['Paths']
+    test_files = pd.read_csv(os.path.join(root, 'numpy', f'{seed}-test.csv'))['Paths']
 
     token_list = []
-    # for f in tqdm(train_files):
-    for f in train_files:
+    for f in tqdm(train_files):
         f = f[:-4]+f'-{seed}.csv'
-        print(f)
-        ts = pd.read_csv(os.path.join(root, f))
+        ts = pd.read_csv(os.path.join(root, f), usecols=['Hours', 'VALUE', 'ITEMID_UOM'])
         ts[f'TOKEN_{n_bins}'] = ts.apply(tokenize, axis=1)
         ts.to_csv(os.path.join(root, f), index=False)
         token_list += list(np.unique(ts[f'TOKEN_{n_bins}']))
-
-        assert True == False
 
     for f in tqdm(valid_files):
         ts = pd.read_csv(os.path.join(root, f))

@@ -138,7 +138,7 @@ class ModelFFNN(nn.Module):
         self.embedder = Embedder(self.n_tokens, self.latent_dim,
                                  dt=self.dt, weighted=self.weighted)
         self.dropout = nn.Dropout(self.p_dropout)
-        self.lstm = LSTM(self.latent_dim, self.hidden_dim)
+        # THIS DECODER NEEDS TO DO: (48, hidden_dim) -> hidden dim
         self.decoder = decoder(self.hidden_dim)
 
     def forward(self, input):
@@ -151,7 +151,7 @@ class ModelFFNN(nn.Module):
             Batch of data. Shape (batch_size, 10000, 2)
         """
         emb = self.dropout(F.relu(self.embedder(input)))
-        all_hidden, (final_hidden, _) = self.lstm(emb)
+        # replace?
         if self.dynamic:
             output = self.decoder(self.dropout(all_hidden))
         else:
